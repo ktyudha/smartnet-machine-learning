@@ -1,0 +1,8 @@
+# Environment
+python-dotenv==1.1.1
+
+# MQTT
+paho-mqtt==2.1.0
+
+# Utilities
+tqdm==4.67.1
