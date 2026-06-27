@@ -3,6 +3,7 @@ from .core import (
     MQTT_PORT,
     MQTT_USERNAME,
     MQTT_PASSWORD,
+    MODELS_DIR,
 )
 
 from .logger import (

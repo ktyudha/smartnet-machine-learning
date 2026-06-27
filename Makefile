@@ -10,6 +10,15 @@ help:
 	@echo "  make run       Run application"
 	@echo "  make freeze    Update requirements.txt"
 	@echo "  make clean     Remove virtual environment"
+	@echo ""
+	@echo "ML Pipeline:"
+	@echo "  make prepare   Clean raw data → interim & processed"
+	@echo "  make train     Train Decision Tree model"
+	@echo "  make evaluate  Evaluate model on full dataset"
+	@echo "  make pipeline  Run prepare → train → evaluate"
+	@echo "  make tune          GridSearchCV tuning → save best model → evaluate on test set"
+	@echo "  make pipeline-tune Run prepare → tune (full pipeline dengan tuning)"
+	@echo "  make predict       Contoh: make predict RSSI=-112 SNR=-18.5"
 
 .PHONY: install
 install:
@@ -28,3 +37,32 @@ freeze:
 .PHONY: clean
 clean:
 	rm -rf $(VENV)
+
+.PHONY: prepare
+prepare:
+	$(PYTHON_VENV) cli.py prepare
+
+.PHONY: train
+train:
+	$(PYTHON_VENV) cli.py train
+
+.PHONY: evaluate
+evaluate:
+	$(PYTHON_VENV) cli.py evaluate
+
+.PHONY: pipeline
+pipeline: prepare train evaluate
+
+.PHONY: tune
+tune:
+	$(PYTHON_VENV) cli.py tune
+
+.PHONY: pipeline-tune
+pipeline-tune: prepare tune
+
+RSSI ?= -100
+SNR  ?= -15
+
+.PHONY: predict
+predict:
+	$(PYTHON_VENV) cli.py predict --rssi $(RSSI) --snr $(SNR)
