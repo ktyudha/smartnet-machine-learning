@@ -12,7 +12,8 @@ from src.config import (
     get_logger
 )
 
-from src.mqtt.handlers import get_handlers
+from src.mqtt.subscriber import Subscriber
+from src.mqtt.publisher import Publisher
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,8 @@ class MQTTClient:
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
 
-        self.handlers = get_handlers()
+        self.subscriber = Subscriber(self)
+        self.publisher = Publisher(self)
 
     def connect(self):
         logger.info(
@@ -85,7 +87,7 @@ class MQTTClient:
     ):
         logger.info("Connected")
 
-        for topic in self.handlers:
+        for topic in self.subscriber.topics():
             self.subscribe(topic)
 
     def on_disconnect(
@@ -112,7 +114,4 @@ class MQTTClient:
             payload,
         )
 
-        handler = self.handlers.get(message.topic)
-
-        if handler:
-            handler(payload, self)
+        self.subscriber.dispatch(message.topic, payload)

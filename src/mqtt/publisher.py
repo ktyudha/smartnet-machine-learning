@@ -1,9 +1,9 @@
+from .publishers.status import publish as status_publish
+
+
 class Publisher:
     def __init__(self, client):
         self.client = client
 
-    def relay(self, payload):
-        self.client.publish(
-            TOPIC_RELAY,
-            payload,
-        )
+    def status(self, payload):
+        status_publish(payload, self.client)

@@ -22,5 +22,9 @@ def publish(topic, payload):
     client().publish(topic, payload)
 
 
+def publish_status(payload):
+    client().publisher.status(payload)
+
+
 def stop():
     client().stop()
