@@ -1,2 +1,8 @@
-UPLINK_TOPIC = "v1/devices/uplink-p2p"
-COMMAND_TOPIC = "v1/devices/downlink-p2p"
+
+VERSION = "v1"
+TYPE_DEVICES = "devices"
+
+BASE_V1_DEVICE = f"{VERSION}/{TYPE_DEVICES}"
+
+UPLINK_TOPIC = f"{BASE_V1_DEVICE}/uplink-p2p"
+DOWNLINK_TOPIC = f"{BASE_V1_DEVICE}/downlink-p2p"

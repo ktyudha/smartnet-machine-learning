@@ -1,8 +1,10 @@
-from src.mqtt.client import MQTTClient
+from src import mqtt
+from src.config import setup_logger
 
 def main():
-    mqtt = MQTTClient()
+    setup_logger()
     mqtt.start()
+    
 
 if __name__ == "__main__":
     main()

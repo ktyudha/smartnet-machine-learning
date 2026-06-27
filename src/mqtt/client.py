@@ -1,20 +1,20 @@
 import json
-import logging
 
 import paho.mqtt.client as mqtt
 
-from src.config.core import (
+
+from src.config import (
     MQTT_HOST,
+    MQTT_PASSWORD,
     MQTT_PORT,
     MQTT_USERNAME,
-    MQTT_PASSWORD,
+
+    get_logger
 )
 
-from src.mqtt.topics import (
-    UPLINK_TOPIC,
-)
+from src.mqtt.handlers import get_handlers
 
-logging.basicConfig(level=logging.INFO)
+logger = get_logger(__name__)
 
 
 class MQTTClient:
@@ -25,11 +25,6 @@ class MQTTClient:
             transport="websockets",
         )
 
-        # NATIVE
-        # self.client = mqtt.Client(
-        #     mqtt.CallbackAPIVersion.VERSION2,
-        # )
-
         self.client.username_pw_set(
             MQTT_USERNAME,
             MQTT_PASSWORD,
@@ -39,9 +34,13 @@ class MQTTClient:
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
 
+        self.handlers = get_handlers()
+
     def connect(self):
-        logging.info(
-            f"Connecting to {MQTT_HOST}:{MQTT_PORT}"
+        logger.info(
+            "Connecting MQTT %s:%s",
+            MQTT_HOST,
+            MQTT_PORT,
         )
 
         self.client.connect(
@@ -52,26 +51,68 @@ class MQTTClient:
 
     def start(self):
         self.connect()
-        self.client.loop_forever()
 
-    def publish(self, topic, payload):
+        try:
+            logger.info("Starting MQTT loop")
+            self.client.loop_forever()
+        except KeyboardInterrupt:
+            self.stop()
+
+    def stop(self):
+        logger.info("Stopping MQTT")
+        self.client.disconnect()
+
+    def publish(self, topic: str, payload):
         if isinstance(payload, dict):
             payload = json.dumps(payload)
 
-        self.client.publish(topic, payload)
+        result = self.client.publish(topic, payload)
 
-    def subscribe(self, topic):
+        if result.rc != mqtt.MQTT_ERR_SUCCESS:
+            logger.error("Failed publish to %s", topic)
+
+    def subscribe(self, topic: str):
+        logger.info("Subscribe %s", topic)
         self.client.subscribe(topic)
 
-    def on_connect(self, client, userdata, flags, reason_code, properties):
-        logging.info("MQTT Connected")
+    def on_connect(
+        self,
+        client,
+        userdata,
+        flags,
+        reason_code,
+        properties,
+    ):
+        logger.info("Connected")
 
-        self.subscribe(UPLINK_TOPIC)
+        for topic in self.handlers:
+            self.subscribe(topic)
 
-    def on_disconnect(self, client, userdata, flags, reason_code, properties):
-        logging.warning("MQTT Disconnected")
+    def on_disconnect(
+        self,
+        client,
+        userdata,
+        flags,
+        reason_code,
+        properties,
+    ):
+        logger.warning("Disconnected")
 
-    def on_message(self, client, userdata, message):
-        logging.info(
-            f"[{message.topic}] {message.payload.decode()}"
+    def on_message(
+        self,
+        client,
+        userdata,
+        message,
+    ):
+        payload = message.payload.decode()
+
+        logger.info(
+            "[%s] %s",
+            message.topic,
+            payload,
         )
+
+        handler = self.handlers.get(message.topic)
+
+        if handler:
+            handler(payload, self)
