@@ -72,6 +72,13 @@ class LoRaWAN:
                     self.on_confirm(parameter)
                 except Exception:
                     logger.exception("LoRaWAN - on_confirm callback raised")
+        elif event_type == RAK3172.EVENTS.RECONNECTED:
+            logger.warning("LoRaWAN - device reconnected, rejoining")
+            self.state = LoRaWAN.STATE.DISCONNECTED
+            try:
+                self.join()
+            except Exception:
+                logger.exception("LoRaWAN - rejoin after reconnect failed")
         else:
             logger.debug("LoRaWAN - unhandled event %s: %s", event_type, parameter)
 

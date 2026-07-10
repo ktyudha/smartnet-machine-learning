@@ -26,5 +26,9 @@ def publish_status(payload):
     client().publisher.status(payload)
 
 
+def publish_uplink(payload):
+    client().publisher.uplink(payload)
+
+
 def stop():
     client().stop()

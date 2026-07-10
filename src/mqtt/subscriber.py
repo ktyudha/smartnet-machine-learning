@@ -1,8 +1,6 @@
-from .subscribers.uplink import subscribe as uplink_subscribe
 from .subscribers.downlink import subscribe as downlink_subscribe
 
 from .topics import (
-    UPLINK_TOPIC,
     DOWNLINK_TOPIC,
 )
 
@@ -11,7 +9,6 @@ class Subscriber:
     def __init__(self, client):
         self.client = client
         self.handlers = {
-            UPLINK_TOPIC: uplink_subscribe,
             DOWNLINK_TOPIC: downlink_subscribe,
         }
 

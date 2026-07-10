@@ -4,6 +4,7 @@ from src.commands.convert import run as convert
 from src.commands.train import run as train
 from src.commands.evaluate import run as evaluate
 from src.commands.predict import run as predict
+from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
 
@@ -31,6 +32,9 @@ def main():
     # predict
     sub.add_parser("predict")
 
+    # lora-ports
+    sub.add_parser("lora-ports")
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -44,6 +48,9 @@ def main():
 
     elif args.command == "predict":
         predict(args)
+
+    elif args.command == "lora-ports":
+        lora_ports(args)
 
     else:
         parser.print_help()

@@ -30,6 +30,7 @@ class RAK3172:
         RECEIVED=2
         ERROR=3
         TIMEOUT=4
+        RECONNECTED=5
 
     class P2P_RX:
         DISABLE = 0
@@ -40,6 +41,7 @@ class RAK3172:
         self.serial_port = serial_port
         self.verbose = verbose
         self.__callback_events = callback_events
+        self.__reconnecting_lock = threading.Lock()
 
         # Open serial port
         try:
@@ -66,7 +68,11 @@ class RAK3172:
     def thread_rx(self):
         self.thread_rx_ready.set()
         while not self.thread_rx_kill.is_set():
-            rx = self.serial.read_until(b"\r\n").decode("ASCII").rstrip().upper()
+            try:
+                rx = self.serial.read_until(b"\r\n").decode("ASCII").rstrip().upper()
+            except serial.SerialException:
+                self._reconnect()
+                continue
             if not len(rx):
                 # Drop empty lines
                 continue
@@ -90,7 +96,18 @@ class RAK3172:
                         rssi, snr, payload = parts[2].strip(), parts[3].strip(), parts[4].strip()
                         self.__callback_events(RAK3172.EVENTS.RECEIVED, f"{rssi}:{snr}:{payload}")
 
+            elif "CURRENT WORK MODE" in rx:
+                # The module reboots on its own sometimes (power/watchdog
+                # reset) without the USB-serial link dropping at all - this
+                # boot banner is the only sign. Radio config and RX mode
+                # don't survive it, so callers must redo them.
+                print(f"WARNING - {self.serial_port} reported a reboot: {rx}")
+                self._notify_reconnected()
             else:
+                # RUI3 firmware (e.g. RUI_4.2.0) echoes the command name in
+                # query replies, e.g. "AT+NWM=0" instead of a bare "0".
+                if rx.startswith("AT+") and "=" in rx:
+                    rx = rx.split("=", 1)[1]
                 self.data_rx = rx
                 self.data_received.set()
                 time_start = time.time()
@@ -101,6 +118,53 @@ class RAK3172:
                         self.data_received.clear()
                         self.data_rx = ""
             self.thread_rx_ready.set()
+
+    def _reconnect(self):
+        # The module can reboot on its own (power/watchdog reset), which
+        # drops the USB-serial device node until it re-enumerates. Radio
+        # config and RX mode don't survive that, so callers must redo them
+        # via the RECONNECTED event once the link is back.
+        print(f"WARNING - Serial port {self.serial_port} lost, reconnecting...")
+        self.thread_rx_ready.clear()
+        try:
+            self.serial.close()
+        except Exception:
+            pass
+
+        while not self.thread_rx_kill.is_set():
+            time.sleep(2)
+            try:
+                self.serial = serial.Serial(self.serial_port, 115200, timeout=1)
+                self.serial.reset_input_buffer()
+                break
+            except serial.SerialException:
+                continue
+
+        if self.thread_rx_kill.is_set():
+            return
+
+        print(f"Reconnected to {self.serial_port}")
+        self.thread_rx_ready.set()
+        self._notify_reconnected()
+
+    def _notify_reconnected(self):
+        # Runs the callback on its own thread: it typically re-sends AT
+        # commands (e.g. configure_p2p), which needs this RX thread free to
+        # read the responses - calling it inline here would deadlock.
+        # The lock drops duplicate/overlapping triggers (e.g. a burst of
+        # boot-banner lines) so only one reconfigure attempt runs at a time.
+        if not self.__callback_events:
+            return
+        if not self.__reconnecting_lock.acquire(blocking=False):
+            return
+
+        def run():
+            try:
+                self.__callback_events(RAK3172.EVENTS.RECONNECTED, None)
+            finally:
+                self.__reconnecting_lock.release()
+
+        threading.Thread(target=run, daemon=True).start()
 
     @property
     def network_mode(self):
@@ -267,6 +331,11 @@ class RAK3172:
         Konfigurasi perangkat ke mode P2P dengan parameter yang diberikan
         """
         self.network_mode = RAK3172.NETWORK_MODES.P2P
+
+        # A prior session may have left continuous RX on (e.g. crashed
+        # without calling close()); radio params can't be set while it's on.
+        self.send_command(f"AT+PRECV={RAK3172.P2P_RX.DISABLE}")
+        time.sleep(0.2)
 
         p2p_params = {
             "AT+PFREQ": frequency,      # Frekuensi LoRa

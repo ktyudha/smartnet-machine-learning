@@ -15,6 +15,7 @@ the framing/retry logic below.
 import logging
 import os
 import sys
+import threading
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib"))
@@ -43,14 +44,9 @@ class LoRaP2P:
         self.on_receive = on_receive
         self.encoders = encoders or []
         self.decoders = decoders or []
+        self._rearm_lock = threading.Lock()
 
-        self.device = RAK3172(
-            serial_port=serial_port,
-            network_mode=RAK3172.NETWORK_MODES.P2P,
-            verbose=verbose,
-            callback_events=self._handle_event,
-        )
-        self.device.configure_p2p(
+        self._p2p_params = dict(
             frequency=frequency,
             spreading_factor=spreading_factor,
             bandwidth=bandwidth,
@@ -59,12 +55,36 @@ class LoRaP2P:
             tx_power=tx_power,
         )
 
+        self.device = RAK3172(
+            serial_port=serial_port,
+            network_mode=RAK3172.NETWORK_MODES.P2P,
+            verbose=verbose,
+            callback_events=self._handle_event,
+        )
+        self.device.configure_p2p(**self._p2p_params)
+
     def _handle_event(self, event_type, parameter):
-        # Runs on the RX thread: never let a malformed frame or a failing
+        # Runs on the RX thread (or, for RECONNECTED, a throwaway thread
+        # spawned by it): never let a malformed frame or a failing
         # decoder/callback propagate, or the whole listener silently dies.
+        if event_type == RAK3172.EVENTS.RECONNECTED:
+            logger.warning("LoRaP2P - device reconnected, reapplying P2P config")
+            try:
+                self.device.configure_p2p(**self._p2p_params)
+            except Exception:
+                logger.exception("LoRaP2P - failed to reapply config after reconnect")
+            return
+
         if event_type != RAK3172.EVENTS.RECEIVED:
             logger.debug("LoRaP2P - unhandled event %s: %s", event_type, parameter)
             return
+
+        # This firmware drops back to idle after delivering a single packet
+        # despite AT+PRECV=65535 claiming "continuous" reception - re-arm
+        # unconditionally (even if the frame below turns out malformed), off
+        # the RX thread since it sends AT commands and needs that same
+        # thread free to read the responses.
+        threading.Thread(target=self._rearm_rx, daemon=True).start()
 
         try:
             rssi, snr, hex_payload = parameter.split(":")
@@ -86,6 +106,20 @@ class LoRaP2P:
                 self.on_receive(from_addr, to_addr, payload, rssi, snr)
             except Exception:
                 logger.exception("LoRaP2P - on_receive callback raised")
+
+    def _rearm_rx(self):
+        # The disable/enable round trip needs ~0.5s of settle time each way
+        # (see enable_p2p_rx) - going faster made the module reboot in
+        # testing. The lock drops overlapping triggers from concurrent
+        # RECEIVED events onto a single attempt at a time.
+        if not self._rearm_lock.acquire(blocking=False):
+            return
+        try:
+            self.device.enable_p2p_rx()
+        except Exception:
+            logger.exception("LoRaP2P - failed to re-arm P2P RX after receive")
+        finally:
+            self._rearm_lock.release()
 
     def send(self, to_addr, payload, retries=3, retry_delay=0.5):
         """Frame `payload` with the from/to address header and transmit it, retrying on failure."""
