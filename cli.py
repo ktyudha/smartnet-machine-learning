@@ -6,6 +6,7 @@ from src.commands.train import run as train
 from src.commands.tune import run as tune
 from src.commands.evaluate import run as evaluate
 from src.commands.predict import run as predict
+from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
 
@@ -41,6 +42,9 @@ def main():
     predict_parser.add_argument("--rssi", required=True, type=float)
     predict_parser.add_argument("--snr", required=True, type=float)
 
+    # lora-ports
+    sub.add_parser("lora-ports")
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -60,6 +64,9 @@ def main():
 
     elif args.command == "predict":
         predict(args)
+
+    elif args.command == "lora-ports":
+        lora_ports(args)
 
     else:
         parser.print_help()

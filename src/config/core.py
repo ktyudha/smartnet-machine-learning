@@ -11,3 +11,13 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD_SERVER")
 
 MQTT_HOST = os.getenv("MQTT_BROKER_WS")
 MQTT_PORT = int(os.getenv("MQTT_PORT_WS", "1883"))
+
+LORA_SERIAL_PORT = os.getenv("LORA_SERIAL_PORT", "/dev/tty.usbserial-110")
+LORA_ADDRESS = int(os.getenv("LORA_ADDRESS", "1"))
+LORA_FREQUENCY = int(os.getenv("LORA_FREQUENCY", "915000000"))
+LORA_SPREADING_FACTOR = int(os.getenv("LORA_SPREADING_FACTOR", "7"))
+LORA_BANDWIDTH = int(os.getenv("LORA_BANDWIDTH", "0"))
+LORA_CODING_RATE = int(os.getenv("LORA_CODING_RATE", "0"))
+LORA_PREAMBLE = int(os.getenv("LORA_PREAMBLE", "8"))
+LORA_TX_POWER = int(os.getenv("LORA_TX_POWER", "22"))
+LORA_VERBOSE = os.getenv("LORA_VERBOSE", "false").lower() == "true"
