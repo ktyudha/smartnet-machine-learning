@@ -1,7 +1,14 @@
-PYTHON := python3.12
 VENV := .venv
-PIP := $(VENV)/bin/pip
-PYTHON_VENV := $(VENV)/bin/python
+
+ifeq ($(OS),Windows_NT)
+    PYTHON := python
+    BIN := $(VENV)/Scripts
+else
+    PYTHON := python3.12
+    BIN := $(VENV)/bin
+endif
+
+PYTHON_VENV := $(BIN)/python
 
 .PHONY: help
 help:
@@ -23,8 +30,9 @@ help:
 .PHONY: install
 install:
 	$(PYTHON) -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt
+	$(PYTHON_VENV) -m ensurepip --upgrade
+	$(PYTHON_VENV) -m pip install --upgrade pip
+	$(PYTHON_VENV) -m pip install -r requirements.txt
 
 .PHONY: run
 run:
@@ -32,11 +40,11 @@ run:
 
 .PHONY: freeze
 freeze:
-	$(PIP) freeze > requirements.txt
+	$(PYTHON_VENV) -m pip freeze > requirements.txt
 
 .PHONY: clean
 clean:
-	rm -rf $(VENV)
+	$(PYTHON) -c "import shutil; shutil.rmtree('$(VENV)', ignore_errors=True)"
 
 .PHONY: prepare
 prepare:
