@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+MODELS_DIR = BASE_DIR / "models"
 load_dotenv(BASE_DIR / ".env")
 
 MQTT_USERNAME = os.getenv("MQTT_USERNAME_SERVER")
