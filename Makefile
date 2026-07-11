@@ -4,7 +4,7 @@ ifeq ($(OS),Windows_NT)
     PYTHON := python
     BIN := $(VENV)/Scripts
 else
-    PYTHON := python3.12
+    PYTHON := python3
     BIN := $(VENV)/bin
 endif
 
@@ -15,6 +15,9 @@ help:
 	@echo "Available commands:"
 	@echo "  make install   Create virtualenv & install dependencies"
 	@echo "  make run       Run application"
+	@echo "  make run-bg    Run application in background (nohup, survives SSH disconnect)"
+	@echo "  make stop      Stop background process started with make run-bg"
+	@echo "  make logs      Tail logs from run-bg (run.log)"
 	@echo "  make freeze    Update requirements.txt"
 	@echo "  make clean     Remove virtual environment"
 	@echo ""
@@ -37,6 +40,23 @@ install:
 .PHONY: run
 run:
 	$(PYTHON_VENV) main.py
+
+.PHONY: run-bg
+run-bg:
+	nohup $(PYTHON_VENV) main.py > run.log 2>&1 & echo $$! > run.pid
+	@echo "Started in background (PID $$(cat run.pid)). Logs: run.log. SSH can be closed safely."
+
+.PHONY: stop
+stop:
+	@if [ -f run.pid ]; then \
+		kill $$(cat run.pid) && rm run.pid && echo "Stopped."; \
+	else \
+		echo "run.pid not found, process may not be running."; \
+	fi
+
+.PHONY: logs
+logs:
+	tail -f run.log
 
 .PHONY: freeze
 freeze:
