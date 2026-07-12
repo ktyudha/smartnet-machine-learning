@@ -30,11 +30,15 @@ make evaluate        # cli.py evaluate — evaluate saved model on test split
 make pipeline        # prepare -> train -> evaluate
 make pipeline-tune   # prepare -> tune
 make predict RSSI_T2=-90 RSSI_T1=-95 RSSI_T0=-100 SNR_T2=2 SNR_T1=-2 SNR_T0=-6
+make report          # cli.py report — confusion matrix, classification report, feature importance,
+                      # decision tree diagram -> reports/ (evaluates the saved model on the test split)
 ```
 
 Other `cli.py` subcommands not wired into the Makefile:
 - `python cli.py convert --input <xlsx> --output <csv>` — Excel → CSV for raw data prep.
 - `python cli.py lora-ports` — list serial ports and flag which one matches `.env`'s `LORA_SERIAL_PORT`.
+- `python cli.py generate-dataset [--sessions 950] [--session-length 12] [--seed 42] [--output data/raw/dataset_rssi_snr_v2.csv]`
+  — synthetic RSSI/SNR dataset generator (`src/commands/generate_dataset.py`), see "Dataset provenance" below.
 
 There is no test runner configured (no pytest in `requirements.txt`, no pytest config). Tests
 are plain scripts with a `if __name__ == "__main__"` block; run them as modules from the repo
@@ -48,9 +52,12 @@ python -m tests.mqtt.test_publish_status
 
 ### Config (`src/config`)
 `core.py` loads `.env` from the repo root once and exposes every MQTT/LoRa setting as a module
-constant (`MQTT_HOST`, `LORA_SERIAL_PORT`, etc.) plus `MODELS_DIR`. `src/config/__init__.py`
-re-exports these alongside `setup_logger`/`get_logger`. This is the only place env vars are
-read — everything else imports from `src.config`.
+constant (`MQTT_HOST`, `LORA_SERIAL_PORT`, etc.) plus `MODELS_DIR`, `RELAY_ADDRESS` (env
+`RELAY_ADDRESS`, default `2` — the LoRa node address the downlink relay command is sent to) and
+`RELAY_HYSTERESIS` (env `RELAY_HYSTERESIS`, default `2` — consecutive-prediction threshold, see
+`RelayActivation` below). `src/config/__init__.py` re-exports these alongside
+`setup_logger`/`get_logger`. This is the only place env vars are read — everything else imports
+from `src.config`.
 
 ### Gateway data flow (`main.py`)
 `main.py` starts MQTT on a background thread and runs the LoRa listener on the main thread;
@@ -136,15 +143,54 @@ would leak the target.
   hysteresis state across calls.
 - `src/training/load_dataset.py` (bare `load_dataset(path)`) is dead/unused — `src/preprocessing/dataset.py:load()`
   is the one actually wired into `prepare`.
+- `src/commands/report.py` (`cli.py report` / `make report`): loads the saved model + test split and
+  writes 4 thesis-ready artifacts to `reports/` — `classification_report.csv` plus
+  `reports/figures/{confusion_matrix,feature_importance,decision_tree}.png`. All tables/plots use a
+  fixed `SEVERITY_ORDER = [Excellent, Good, Fair, Weak, Poor]` (never sklearn's alphabetical default)
+  since the target is an ordinal scale. Confusion matrix is transposed + column-normalized (Predicted
+  vertical / True horizontal). Decision tree plot is truncated to `max_depth=3` for readability — the
+  real trained tree is much deeper — and left unfilled (`filled=False`) to avoid sklearn's uncontrolled
+  rainbow node-coloring.
+- `src/commands/generate_dataset.py` (`cli.py generate-dataset`): a synthetic RSSI/SNR time-series
+  simulator, see "Dataset provenance" below.
 - `notebooks/01_exploration.ipynb` → `02_preprocessing.ipynb` → `03_training.ipynb` mirror these
   pipeline stages for interactive/exploratory work; they predate the multi-class/trend-feature
   rework and have not been updated to match — treat them as stale until revisited.
 
-**On labeling** (per the research discussion this pipeline implements): the target should ideally
-represent the *next* window's quality, not the current window's — otherwise the model just
-re-learns a threshold rule instead of a genuine degradation trend. Whatever generates
-`data/raw/dataset_rssi_snr.csv` is responsible for that shift; nothing in this pipeline enforces
-it, so check the label semantics in your dataset before trusting the "predictive" framing.
+**On labeling** (per the research discussion this pipeline implements): the target must represent
+the *next* window's quality, not the current window's — otherwise the model just re-learns a
+threshold rule instead of a genuine degradation trend (see "Dataset provenance" — this is exactly
+what happened with the first real dataset). Whatever generates `data/raw/dataset_rssi_snr.csv` is
+responsible for that shift; nothing in this pipeline enforces it, so check the label semantics in
+your dataset before trusting the "predictive" framing.
+
+### Dataset provenance (`data/raw/`)
+`data/raw/dataset_rssi_snr.csv` has been swapped once, and the reason matters for anyone continuing
+this work:
+
+- **v1 — `dataset_rssi_snr_v1_descriptive.csv`** (backup of the original real-world dataset, 8754
+  rows). Its `label` was generated *descriptively* — from the same window's own RSSI/SNR stats — not
+  from the next reading. Training on it gave 82.58% test accuracy but `feature_importances_` put
+  0.801 on `rssi_t0` alone: the tree had learned a near-lookup of the label-generating rule rather than
+  any trend signal, and the `delta_*` features carried almost no weight. That's the failure mode this
+  file's "On labeling" warning above is about.
+- **v2 — `dataset_rssi_snr_v2.csv`** (current `dataset_rssi_snr.csv`, generated by
+  `generate-dataset`, 8550 rows, `sessions=950 session_length=12 seed=42`): a synthetic per-session
+  RSSI/SNR simulator (`src/commands/generate_dataset.py`) with 6 named archetypes (`stable_good`,
+  `stable_medium`, `stable_poor`, `degrading`, `improving`, `noisy_borderline` — baseline + linear
+  drift + Gaussian noise per session) whose tier-boundary rule (`RSSI_BASE_CUTS`, `EXPECTED_SNR`) was
+  calibrated from v1's real per-label RSSI/SNR means. Each row's 3-reading window (t-2,t-1,t0) is
+  labeled from the *next* simulated reading (t+1), enforcing next-state labeling by construction.
+  Result: test accuracy dropped to 75.38% (expected — forecasting is harder than describing) and
+  `rssi_t0`/`snr_t0` importance dropped to 0.388/0.362 with `delta_*` features rising from ~0 to a
+  combined ~0.144. Interpretation: t0 still dominates because current reading is genuinely
+  autocorrelated with the next one on a real channel — that's expected physics, not leakage — but the
+  trend features now carry real, non-zero predictive weight, which they didn't in v1.
+- Every row generated by `generate-dataset` carries `source ∈ {"synthetic", "synthetic_transition"}`
+  (never `"real"`) — don't relabel this data as real-world in any thesis figure/table.
+- Rows are grouped by `session_id` — if you ever change the train/test split to be
+  session-aware (not currently the case; `scaling.py` splits per-row, stratified on `label` only),
+  keep in mind rows from the same session are correlated.
 
 ### Logging
 `setup_logger()` (called once at the top of both `main.py` and `cli.py`) configures root logging;

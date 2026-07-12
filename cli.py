@@ -6,6 +6,8 @@ from src.commands.train import run as train
 from src.commands.tune import run as tune
 from src.commands.evaluate import run as evaluate
 from src.commands.predict import run as predict
+from src.commands.report import run as report
+from src.commands.generate_dataset import run as generate_dataset
 from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
@@ -49,6 +51,16 @@ def main():
     # lora-ports
     sub.add_parser("lora-ports")
 
+    # report
+    sub.add_parser("report")
+
+    # generate-dataset
+    gen_parser = sub.add_parser("generate-dataset")
+    gen_parser.add_argument("--sessions", type=int, default=950)
+    gen_parser.add_argument("--session-length", type=int, default=12, dest="session_length")
+    gen_parser.add_argument("--seed", type=int, default=42)
+    gen_parser.add_argument("--output", default="data/raw/dataset_rssi_snr_v2.csv")
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -71,6 +83,12 @@ def main():
 
     elif args.command == "lora-ports":
         lora_ports(args)
+
+    elif args.command == "report":
+        report(args)
+
+    elif args.command == "generate-dataset":
+        generate_dataset(args)
 
     else:
         parser.print_help()
