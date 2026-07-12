@@ -8,6 +8,7 @@ from src.commands.evaluate import run as evaluate
 from src.commands.predict import run as predict
 from src.commands.report import run as report
 from src.commands.generate_dataset import run as generate_dataset
+from src.commands.hysteresis_analysis import run as hysteresis_analysis
 from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
@@ -61,6 +62,12 @@ def main():
     gen_parser.add_argument("--seed", type=int, default=42)
     gen_parser.add_argument("--output", default="data/raw/dataset_rssi_snr_v2.csv")
 
+    # hysteresis-analysis
+    hyst_parser = sub.add_parser("hysteresis-analysis")
+    hyst_parser.add_argument("--sessions", type=int, default=300)
+    hyst_parser.add_argument("--session-length", type=int, default=25, dest="session_length")
+    hyst_parser.add_argument("--seed", type=int, default=5000)
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -89,6 +96,9 @@ def main():
 
     elif args.command == "generate-dataset":
         generate_dataset(args)
+
+    elif args.command == "hysteresis-analysis":
+        hysteresis_analysis(args)
 
     else:
         parser.print_help()
