@@ -9,7 +9,7 @@ def evaluate(model, X_test, y_test):
     y_pred = model.predict(X_test)
 
     accuracy = accuracy_score(y_test, y_pred)
-    report = classification_report(y_test, y_pred, target_names=["Direct", "Relay"])
+    report = classification_report(y_test, y_pred)
     cm = confusion_matrix(y_test, y_pred)
 
     logger.info(f"Accuracy: {accuracy:.4f}")

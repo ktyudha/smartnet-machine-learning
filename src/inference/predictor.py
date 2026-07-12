@@ -2,6 +2,7 @@ import pandas as pd
 
 from src.config import get_logger
 from src.inference.load_model import load
+from src.preprocessing.scaling import FEATURES
 
 logger = get_logger(__name__)
 
@@ -16,13 +17,29 @@ def _get_model():
     return _model, _scaler
 
 
-def predict(rssi: float, snr: float):
+def predict(rssi_t2: float, rssi_t1: float, rssi_t0: float,
+            snr_t2: float, snr_t1: float, snr_t0: float) -> str:
+    """Predict the next link-quality class from a 3-reading RSSI/SNR trend window.
+
+    t2 is the oldest reading, t0 the most recent — matching the training features.
+    """
     model, scaler = _get_model()
 
-    X = scaler.transform(pd.DataFrame([[rssi, snr]], columns=["rssi", "snr"]))
-    result = int(model.predict(X)[0])
+    row = {
+        "rssi_t2": rssi_t2, "rssi_t1": rssi_t1, "rssi_t0": rssi_t0,
+        "snr_t2": snr_t2, "snr_t1": snr_t1, "snr_t0": snr_t0,
+        "delta_rssi_1": rssi_t1 - rssi_t2,
+        "delta_rssi_2": rssi_t0 - rssi_t1,
+        "delta_snr_1": snr_t1 - snr_t2,
+        "delta_snr_2": snr_t0 - snr_t1,
+    }
 
-    label = "Relay" if result == 1 else "Direct"
-    logger.info(f"Predict rssi={rssi}, snr={snr} → {result} ({label})")
+    X = scaler.transform(pd.DataFrame([row])[FEATURES])
+    label = str(model.predict(X)[0])
 
-    return result
+    logger.info(
+        "Predict rssi=[%s,%s,%s] snr=[%s,%s,%s] → %s",
+        rssi_t2, rssi_t1, rssi_t0, snr_t2, snr_t1, snr_t0, label,
+    )
+
+    return label

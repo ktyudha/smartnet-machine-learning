@@ -21,3 +21,6 @@ LORA_CODING_RATE = int(os.getenv("LORA_CODING_RATE", "0"))
 LORA_PREAMBLE = int(os.getenv("LORA_PREAMBLE", "8"))
 LORA_TX_POWER = int(os.getenv("LORA_TX_POWER", "22"))
 LORA_VERBOSE = os.getenv("LORA_VERBOSE", "false").lower() == "true"
+
+RELAY_ADDRESS = int(os.getenv("RELAY_ADDRESS", "2"))
+RELAY_HYSTERESIS = int(os.getenv("RELAY_HYSTERESIS", "2"))

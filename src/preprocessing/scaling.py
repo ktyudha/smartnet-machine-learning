@@ -6,8 +6,13 @@ from src.config import get_logger
 
 logger = get_logger(__name__)
 
-FEATURES = ["rssi", "snr"]
-TARGET = "relay"
+FEATURES = [
+    "rssi_t2", "rssi_t1", "rssi_t0",
+    "snr_t2", "snr_t1", "snr_t0",
+    "delta_rssi_1", "delta_rssi_2",
+    "delta_snr_1", "delta_snr_2",
+]
+TARGET = "label"
 
 
 def split_features(df: pd.DataFrame):

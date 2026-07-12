@@ -28,7 +28,7 @@ help:
 	@echo "  make pipeline  Run prepare → train → evaluate"
 	@echo "  make tune          GridSearchCV tuning → save best model → evaluate on test set"
 	@echo "  make pipeline-tune Run prepare → tune (full pipeline dengan tuning)"
-	@echo "  make predict       Contoh: make predict RSSI=-112 SNR=-18.5"
+	@echo "  make predict       Contoh: make predict RSSI_T2=-90 RSSI_T1=-95 RSSI_T0=-100 SNR_T2=2 SNR_T1=-2 SNR_T0=-6"
 
 .PHONY: install
 install:
@@ -88,9 +88,15 @@ tune:
 .PHONY: pipeline-tune
 pipeline-tune: prepare tune
 
-RSSI ?= -100
-SNR  ?= -15
+RSSI_T2 ?= -90
+RSSI_T1 ?= -95
+RSSI_T0 ?= -100
+SNR_T2  ?= 2
+SNR_T1  ?= -2
+SNR_T0  ?= -6
 
 .PHONY: predict
 predict:
-	$(PYTHON_VENV) cli.py predict --rssi $(RSSI) --snr $(SNR)
+	$(PYTHON_VENV) cli.py predict \
+		--rssi-t2 $(RSSI_T2) --rssi-t1 $(RSSI_T1) --rssi-t0 $(RSSI_T0) \
+		--snr-t2 $(SNR_T2) --snr-t1 $(SNR_T1) --snr-t0 $(SNR_T0)

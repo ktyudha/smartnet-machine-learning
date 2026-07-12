@@ -18,8 +18,8 @@ def tune(X, y, cv=5):
     total = _count_combinations()
     logger.info(f"Starting GridSearchCV — {total} combinations, cv={cv}, scoring=f1_macro")
 
-    # StratifiedKFold menjaga proporsi kelas Direct/Relay tetap seimbang
-    # di setiap fold — penting untuk klasifikasi biner
+    # StratifiedKFold menjaga proporsi tiap kelas kualitas sinyal
+    # (Excellent/Good/Fair/Weak/Poor) tetap seimbang di setiap fold
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
 
     grid = GridSearchCV(

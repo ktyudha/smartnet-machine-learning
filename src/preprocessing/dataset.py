@@ -25,10 +25,10 @@ def save_interim(df: pd.DataFrame):
 
 def save_splits(X_train, y_train, X_test, y_test, columns):
     train = pd.DataFrame(X_train, columns=columns)
-    train["relay"] = y_train.values
+    train[y_train.name] = y_train.values
 
     test = pd.DataFrame(X_test, columns=columns)
-    test["relay"] = y_test.values
+    test[y_test.name] = y_test.values
 
     train.to_csv(TRAIN_PATH, index=False)
     test.to_csv(TEST_PATH, index=False)

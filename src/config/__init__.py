@@ -1,4 +1,7 @@
 from .core import (
+    BASE_DIR,
+    MODELS_DIR,
+
     MQTT_HOST,
     MQTT_PORT,
     MQTT_USERNAME,
@@ -13,6 +16,9 @@ from .core import (
     LORA_PREAMBLE,
     LORA_TX_POWER,
     LORA_VERBOSE,
+
+    RELAY_ADDRESS,
+    RELAY_HYSTERESIS,
 )
 
 from .logger import (

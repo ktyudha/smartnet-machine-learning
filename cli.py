@@ -39,8 +39,12 @@ def main():
 
     # predict
     predict_parser = sub.add_parser("predict")
-    predict_parser.add_argument("--rssi", required=True, type=float)
-    predict_parser.add_argument("--snr", required=True, type=float)
+    predict_parser.add_argument("--rssi-t2", required=True, type=float, dest="rssi_t2")
+    predict_parser.add_argument("--rssi-t1", required=True, type=float, dest="rssi_t1")
+    predict_parser.add_argument("--rssi-t0", required=True, type=float, dest="rssi_t0")
+    predict_parser.add_argument("--snr-t2", required=True, type=float, dest="snr_t2")
+    predict_parser.add_argument("--snr-t1", required=True, type=float, dest="snr_t1")
+    predict_parser.add_argument("--snr-t0", required=True, type=float, dest="snr_t0")
 
     # lora-ports
     sub.add_parser("lora-ports")
