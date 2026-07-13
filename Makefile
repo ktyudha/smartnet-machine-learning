@@ -31,6 +31,7 @@ help:
 	@echo "  make predict       Contoh: make predict RSSI_T2=-90 RSSI_T1=-95 RSSI_T0=-100 SNR_T2=2 SNR_T1=-2 SNR_T0=-6"
 	@echo "  make report        Generate confusion matrix, feature importance, tree diagram -> reports/"
 	@echo "  make hysteresis-analysis   Simulate noisy sessions -> relay flap-count comparison -> reports/"
+	@echo "  make predict-plot  Contoh: make predict-plot ARCHETYPE=degrading LENGTH=20 SEED=7 -> reports/figures/predict_trend.png"
 
 .PHONY: install
 install:
@@ -110,3 +111,11 @@ report:
 .PHONY: hysteresis-analysis
 hysteresis-analysis:
 	$(PYTHON_VENV) cli.py hysteresis-analysis
+
+ARCHETYPE ?= degrading
+LENGTH    ?= 20
+SEED      ?= 7
+
+.PHONY: predict-plot
+predict-plot:
+	$(PYTHON_VENV) cli.py predict-plot --archetype $(ARCHETYPE) --length $(LENGTH) --seed $(SEED)

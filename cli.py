@@ -9,6 +9,7 @@ from src.commands.predict import run as predict
 from src.commands.report import run as report
 from src.commands.generate_dataset import run as generate_dataset
 from src.commands.hysteresis_analysis import run as hysteresis_analysis
+from src.commands.predict_plot import run as predict_plot
 from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
@@ -68,6 +69,16 @@ def main():
     hyst_parser.add_argument("--session-length", type=int, default=25, dest="session_length")
     hyst_parser.add_argument("--seed", type=int, default=5000)
 
+    # predict-plot
+    plot_parser = sub.add_parser("predict-plot")
+    plot_parser.add_argument(
+        "--archetype", default="degrading",
+        choices=["stable_good", "stable_medium", "stable_poor", "degrading", "improving", "noisy_borderline"],
+    )
+    plot_parser.add_argument("--length", type=int, default=20)
+    plot_parser.add_argument("--seed", type=int, default=7)
+    plot_parser.add_argument("--input", default=None, help="Path to a raw CSV/XLSX with rssi/snr[/timestamp] columns")
+
     args = parser.parse_args()
 
     if args.command == "convert":
@@ -99,6 +110,9 @@ def main():
 
     elif args.command == "hysteresis-analysis":
         hysteresis_analysis(args)
+
+    elif args.command == "predict-plot":
+        predict_plot(args)
 
     else:
         parser.print_help()
