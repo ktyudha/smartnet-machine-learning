@@ -7,6 +7,7 @@ from src.commands.tune import run as tune
 from src.commands.evaluate import run as evaluate
 from src.commands.predict import run as predict
 from src.commands.report import run as report
+from src.commands.tune_report import run as tune_report
 from src.commands.generate_dataset import run as generate_dataset
 from src.commands.hysteresis_analysis import run as hysteresis_analysis
 from src.commands.predict_plot import run as predict_plot
@@ -56,6 +57,9 @@ def main():
     # report
     sub.add_parser("report")
 
+    # tune-report
+    sub.add_parser("tune-report")
+
     # generate-dataset
     gen_parser = sub.add_parser("generate-dataset")
     gen_parser.add_argument("--sessions", type=int, default=950)
@@ -104,6 +108,9 @@ def main():
 
     elif args.command == "report":
         report(args)
+
+    elif args.command == "tune-report":
+        tune_report(args)
 
     elif args.command == "generate-dataset":
         generate_dataset(args)
