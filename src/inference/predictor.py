@@ -34,7 +34,9 @@ def predict(rssi_t2: float, rssi_t1: float, rssi_t0: float,
         "delta_snr_2": snr_t0 - snr_t1,
     }
 
-    X = scaler.transform(pd.DataFrame([row])[FEATURES])
+    X = pd.DataFrame(
+        scaler.transform(pd.DataFrame([row])[FEATURES]), columns=FEATURES
+    )
     label = str(model.predict(X)[0])
 
     logger.info(
