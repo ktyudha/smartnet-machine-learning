@@ -49,6 +49,9 @@ class LoRaClient:
             LORA_FREQUENCY,
         )
 
+        # Must exist before LoRaP2P starts: packets can arrive mid-__init__.
+        self.link_quality = NodeStateRegistry(hysteresis=RELAY_HYSTERESIS)
+
         self.device = LoRaP2P(
             serial_port=LORA_SERIAL_PORT,
             address=LORA_ADDRESS,
@@ -61,8 +64,6 @@ class LoRaClient:
             on_receive=self.on_receive,
             verbose=LORA_VERBOSE,
         )
-
-        self.link_quality = NodeStateRegistry(hysteresis=RELAY_HYSTERESIS)
 
     def on_receive(self, from_addr, to_addr, payload, rssi, snr):
         # Flow: log the raw frame -> parse it into a SensorReading -> publish
@@ -86,25 +87,39 @@ class LoRaClient:
             logger.warning("Payload tidak lengkap: %r", payload)
             return
 
+        # Frames forwarded by the relay carry the relay->gateway link's
+        # RSSI/SNR, not the node's: feeding them in would mix two links
+        # into one trend window and make the relay toggle itself.
+        from_relay = from_addr == RELAY_ADDRESS
+        label, relay_on, changed, window = None, None, False, None
+        if not from_relay:
+            state = self.link_quality.get(from_addr)
+            label, relay_on, changed = state.observe(float(rssi), float(snr))
+            if label is not None:
+                window = state.window
+                self._record_prediction(from_addr, window, label, relay_on, changed)
+
+        # prediction is null until the node has a full 3-reading window (and
+        # for relay-forwarded frames); consumers (backend/FE) just pass it on.
+        prediction = None
+        if label is not None:
+            prediction = {
+                "window": [[r, s] for r, s in window],
+                "predicted_quality": label,
+                "relay": relay_on,
+                "changed": changed,
+            }
+
         mqtt.publish_uplink(
             {
                 "metadata": {"rssi": rssi, "snr": snr},
                 "uplink": reading.to_dict(),
                 "address": {"from": from_addr, "to": to_addr},
+                "prediction": prediction,
                 "timestamp": int(time.time() * 1000),
             }
         )
 
-        # Frames forwarded by the relay carry the relay->gateway link's
-        # RSSI/SNR, not the node's: feeding them in would mix two links
-        # into one trend window and make the relay toggle itself.
-        if from_addr == RELAY_ADDRESS:
-            return
-
-        state = self.link_quality.get(from_addr)
-        label, relay_on, changed = state.observe(float(rssi), float(snr))
-        if label is not None:
-            self._record_prediction(from_addr, state.window, label, relay_on, changed)
         if not changed:
             return
 
