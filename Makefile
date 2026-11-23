@@ -124,3 +124,13 @@ SEED      ?= 7
 .PHONY: predict-plot
 predict-plot:
 	$(PYTHON_VENV) cli.py predict-plot --archetype $(ARCHETYPE) --length $(LENGTH) --seed $(SEED)
+# Simulasi node -> gateway -> prediksi -> relay (tanpa hardware).
+# Contoh: make simulate SCENARIO=noisy NODES=2 STEPS=50 DELAY=0.1
+SCENARIO ?= degrading
+NODES ?= 1
+STEPS ?= 40
+DELAY ?= 0.3
+
+.PHONY: simulate
+simulate:
+	$(PYTHON_VENV) -m simulation.simulate_gateway --scenario $(SCENARIO) --nodes $(NODES) --steps $(STEPS) --delay $(DELAY)
