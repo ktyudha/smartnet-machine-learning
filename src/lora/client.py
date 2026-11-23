@@ -1,6 +1,8 @@
+import csv
 import os
 import sys
 import time
+from datetime import datetime
 
 sys.path.insert(
     0,
@@ -27,6 +29,15 @@ from src.decision.node_state import NodeStateRegistry
 from src.lora.dto import SensorReading
 
 logger = get_logger(__name__)
+
+PREDICTION_LOG = os.path.join(
+    os.path.dirname(__file__), "..", "..", "logs", "predictions.csv"
+)
+PREDICTION_COLUMNS = [
+    "timestamp", "node",
+    "rssi_t2", "rssi_t1", "rssi_t0", "snr_t2", "snr_t1", "snr_t0",
+    "prediction", "relay_on", "changed",
+]
 
 
 class LoRaClient:
@@ -84,9 +95,16 @@ class LoRaClient:
             }
         )
 
-        label, relay_on, changed = self.link_quality.get(from_addr).observe(
-            float(rssi), float(snr)
-        )
+        # Frames forwarded by the relay carry the relay->gateway link's
+        # RSSI/SNR, not the node's: feeding them in would mix two links
+        # into one trend window and make the relay toggle itself.
+        if from_addr == RELAY_ADDRESS:
+            return
+
+        state = self.link_quality.get(from_addr)
+        label, relay_on, changed = state.observe(float(rssi), float(snr))
+        if label is not None:
+            self._record_prediction(from_addr, state.window, label, relay_on, changed)
         if not changed:
             return
 
@@ -96,6 +114,8 @@ class LoRaClient:
             from_addr, label, command, RELAY_ADDRESS,
         )
         self.send(RELAY_ADDRESS, command)
+        # Tell the node too, so it knows the relay is now forwarding for it.
+        self.send(from_addr, command)
         mqtt.publish_status(
             {
                 "node": from_addr,
@@ -103,6 +123,33 @@ class LoRaClient:
                 "relay": relay_on,
             }
         )
+
+    def _record_prediction(self, node, window, label, relay_on, changed):
+        # One line per prediction: the 3-reading window the model saw
+        # (t-2, t-1, t0), the predicted next-link quality, the relay state
+        # after hysteresis, which node it came from, and when.
+        now = datetime.now()
+        (r2, s2), (r1, s1), (r0, s0) = window
+        logger.info(
+            "PREDICT node=%s window=[t-2:(%s,%s) t-1:(%s,%s) t0:(%s,%s)] "
+            "-> %s relay=%s%s",
+            node, r2, s2, r1, s1, r0, s0, label,
+            "ON" if relay_on else "OFF", " (CHANGED)" if changed else "",
+        )
+        try:
+            os.makedirs(os.path.dirname(PREDICTION_LOG), exist_ok=True)
+            new = not os.path.exists(PREDICTION_LOG)
+            with open(PREDICTION_LOG, "a", newline="") as f:
+                w = csv.writer(f)
+                if new:
+                    w.writerow(PREDICTION_COLUMNS)
+                w.writerow([
+                    now.isoformat(timespec="seconds"), node,
+                    r2, r1, r0, s2, s1, s0,
+                    label, int(relay_on), int(changed),
+                ])
+        except OSError:
+            logger.exception("Gagal menulis %s", PREDICTION_LOG)
 
     def start(self):
         logger.info("LoRa P2P ready")

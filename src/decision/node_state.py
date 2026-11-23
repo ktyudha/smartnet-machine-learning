@@ -18,6 +18,11 @@ class NodeState:
         self._history = deque(maxlen=WINDOW_SIZE)
         self.relay = RelayActivation(hysteresis=hysteresis)
 
+    @property
+    def window(self):
+        """The buffered readings, oldest (t-2) first, as [(rssi, snr), ...]."""
+        return list(self._history)
+
     def observe(self, rssi: float, snr: float):
         """Feed one new reading.
 
