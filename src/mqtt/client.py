@@ -45,7 +45,14 @@ class MQTTClient:
             MQTT_PORT,
         )
 
-        self.client.connect(
+        if MQTT_PORT in (443, 8883):
+            self.client.tls_set()
+
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+
+        # connect_async: an unreachable/unresolvable broker must not kill
+        # the thread; loop_forever() keeps retrying in the background.
+        self.client.connect_async(
             MQTT_HOST,
             MQTT_PORT,
             keepalive=60,
@@ -85,7 +92,11 @@ class MQTTClient:
         reason_code,
         properties,
     ):
-        logger.info("Connected")
+        if reason_code.is_failure:
+            logger.error("MQTT connect refused: %s", reason_code)
+            return
+
+        logger.info("Connected: %s", reason_code)
 
         for topic in self.subscriber.topics():
             self.subscribe(topic)
@@ -98,7 +109,7 @@ class MQTTClient:
         reason_code,
         properties,
     ):
-        logger.warning("Disconnected")
+        logger.warning("Disconnected: %s", reason_code)
 
     def on_message(
         self,

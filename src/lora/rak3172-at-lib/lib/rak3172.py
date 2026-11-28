@@ -58,8 +58,17 @@ class RAK3172:
         self.thread_rx_handle.start()
 
         # Check chip presence
-        if self.status() is not True:
+        # Retry: the port can bounce right after opening (USB-serial DTR
+        # reset), during which the RX thread is busy reconnecting.
+        detected = False
+        for _ in range(5):
+            if self.status() is True:
+                detected = True
+                break
+            time.sleep(1)
+        if not detected:
             print("ERROR - Unable to detect chip")
+            self.thread_rx_kill.set()
             exit()
 
         # Ensure network mode
@@ -363,6 +372,16 @@ class RAK3172:
         self.send_command(f"AT+PRECV={RAK3172.P2P_RX.CONTINUOUS}")  # Aktifkan RX terus-menerus
         time.sleep(0.5)
         print("P2P RX enabled and listening for packets...")
+
+    def rearm_p2p_rx(self):
+        """
+        Re-arm RX after a received packet with minimal deaf time. Tries a
+        direct AT+PRECV=65535 first (the module is already idle after RX);
+        falls back to the slow disable/enable cycle if it is refused.
+        """
+        status, _ = self.send_command(f"AT+PRECV={RAK3172.P2P_RX.CONTINUOUS}")
+        if status != "OK":
+            self.enable_p2p_rx()
 
     @property
     def get_p2p_data(self):

@@ -68,6 +68,11 @@ class LoRaP2P:
         # spawned by it): never let a malformed frame or a failing
         # decoder/callback propagate, or the whole listener silently dies.
         if event_type == RAK3172.EVENTS.RECONNECTED:
+            if getattr(self, "device", None) is None:
+                # Port bounced during RAK3172.__init__, before self.device
+                # exists; __init__ applies the config itself afterwards.
+                logger.warning("LoRaP2P - reconnected during startup, ignoring")
+                return
             logger.warning("LoRaP2P - device reconnected, reapplying P2P config")
             try:
                 self.device.configure_p2p(**self._p2p_params)
@@ -115,7 +120,7 @@ class LoRaP2P:
         if not self._rearm_lock.acquire(blocking=False):
             return
         try:
-            self.device.enable_p2p_rx()
+            self.device.rearm_p2p_rx()
         except Exception:
             logger.exception("LoRaP2P - failed to re-arm P2P RX after receive")
         finally:
