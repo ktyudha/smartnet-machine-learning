@@ -1,6 +1,8 @@
 import csv
 import os
+import queue
 import sys
+import threading
 import time
 from datetime import datetime
 
@@ -52,6 +54,16 @@ class LoRaClient:
         # Must exist before LoRaP2P starts: packets can arrive mid-__init__.
         self.link_quality = NodeStateRegistry(hysteresis=RELAY_HYSTERESIS)
 
+        # Downlinks are sent from a worker thread, never from on_receive:
+        # on_receive runs on the RAK3172 RX thread, and send_command() needs
+        # that same thread free to read the module's AT replies. Sending
+        # inline deadlocks until the 10s timeouts expire and every send fails.
+        # Recent direct node payloads, to drop the relay's duplicate copy.
+        self._recent_direct = {}
+        self._tx_queue = queue.Queue()
+        self._tx_thread = threading.Thread(target=self._tx_loop, daemon=True)
+        self._tx_thread.start()
+
         self.device = LoRaP2P(
             serial_port=LORA_SERIAL_PORT,
             address=LORA_ADDRESS,
@@ -81,6 +93,18 @@ class LoRaClient:
             snr,
             payload,
         )
+
+        now = time.time()
+        key = (payload,)
+        if from_addr == RELAY_ADDRESS:
+            if now - self._recent_direct.get(key, 0) < 5:
+                logger.info("Duplicate relay-forwarded frame dropped")
+                return
+        else:
+            self._recent_direct = {
+                k: t for k, t in self._recent_direct.items() if now - t < 5
+            }
+            self._recent_direct[key] = now
 
         reading = SensorReading.from_payload(payload)
         if reading is None:
@@ -128,9 +152,9 @@ class LoRaClient:
             "Node %s predicted quality=%s → %s (relay address %s)",
             from_addr, label, command, RELAY_ADDRESS,
         )
-        self.send(RELAY_ADDRESS, command)
+        self.send_async(RELAY_ADDRESS, command)
         # Tell the node too, so it knows the relay is now forwarding for it.
-        self.send(from_addr, command)
+        self.send_async(from_addr, command)
         mqtt.publish_status(
             {
                 "node": from_addr,
@@ -178,6 +202,23 @@ class LoRaClient:
     def send(self, to_addr, payload):
         return self.device.send(to_addr, payload)
 
+    def send_async(self, to_addr, payload):
+        """Queue a downlink for the TX worker; safe to call from on_receive."""
+        self._tx_queue.put((to_addr, payload))
+
+    def _tx_loop(self):
+        while True:
+            item = self._tx_queue.get()
+            if item is None:
+                return
+            to_addr, payload = item
+            try:
+                if not self.send(to_addr, payload):
+                    logger.error("Downlink %r to %s failed", payload, to_addr)
+            except Exception:
+                logger.exception("Downlink %r to %s raised", payload, to_addr)
+
     def stop(self):
         logger.info("Stopping LoRa P2P")
+        self._tx_queue.put(None)
         self.device.close()
