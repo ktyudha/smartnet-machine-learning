@@ -20,6 +20,7 @@ help:
 	@echo "  make logs      Tail logs from run-bg (run.log)"
 	@echo "  make freeze    Update requirements.txt"
 	@echo "  make clean     Remove virtual environment"
+	@echo "  make ports     List serial ports & flag the one matching LORA_SERIAL_PORT in .env"
 	@echo ""
 	@echo "ML Pipeline:"
 	@echo "  make prepare   Clean raw data → interim & processed"
@@ -61,6 +62,10 @@ stop:
 .PHONY: logs
 logs:
 	tail -f run.log
+
+.PHONY: ports
+ports:
+	$(PYTHON_VENV) cli.py lora-ports
 
 .PHONY: freeze
 freeze:
