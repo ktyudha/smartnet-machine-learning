@@ -39,12 +39,16 @@ class LoRaP2P:
         encoders=None,
         decoders=None,
         verbose=False,
+        rx_watchdog=15,
     ):
         self.address = address
         self.on_receive = on_receive
         self.encoders = encoders or []
         self.decoders = decoders or []
         self._rearm_lock = threading.Lock()
+        self._last_rx = time.monotonic()
+        self._rx_watchdog = rx_watchdog
+        self._closing = threading.Event()
 
         self._p2p_params = dict(
             frequency=frequency,
@@ -62,6 +66,32 @@ class LoRaP2P:
             callback_events=self._handle_event,
         )
         self.device.configure_p2p(**self._p2p_params)
+
+        if self._rx_watchdog:
+            threading.Thread(target=self._watchdog_loop, daemon=True).start()
+
+    def _watchdog_loop(self):
+        # The module can silently stop listening (e.g. a re-arm that was
+        # acknowledged but didn't take, or a bounce that didn't surface as
+        # an event). If nothing has been received for `rx_watchdog` seconds,
+        # force a full RX re-enable. Costs ~1s deaf time per idle window,
+        # so keep rx_watchdog well above the nodes' normal send interval.
+        while not self._closing.wait(1):
+            idle = time.monotonic() - self._last_rx
+            if idle < self._rx_watchdog:
+                continue
+            if not self._rearm_lock.acquire(blocking=False):
+                continue
+            try:
+                logger.warning(
+                    "LoRaP2P - no packet for %.0fs, forcing full RX re-enable", idle
+                )
+                self.device.enable_p2p_rx()
+            except Exception:
+                logger.exception("LoRaP2P - watchdog RX re-enable failed")
+            finally:
+                self._last_rx = time.monotonic()
+                self._rearm_lock.release()
 
     def _handle_event(self, event_type, parameter):
         # Runs on the RX thread (or, for RECONNECTED, a throwaway thread
@@ -89,6 +119,7 @@ class LoRaP2P:
         # unconditionally (even if the frame below turns out malformed), off
         # the RX thread since it sends AT commands and needs that same
         # thread free to read the responses.
+        self._last_rx = time.monotonic()
         threading.Thread(target=self._rearm_rx, daemon=True).start()
 
         try:
@@ -120,7 +151,8 @@ class LoRaP2P:
         if not self._rearm_lock.acquire(blocking=False):
             return
         try:
-            self.device.rearm_p2p_rx()
+            if self.device.rearm_p2p_rx() is False:
+                logger.warning("LoRaP2P - fast RX re-arm refused, used full re-enable")
         except Exception:
             logger.exception("LoRaP2P - failed to re-arm P2P RX after receive")
         finally:
@@ -154,5 +186,6 @@ class LoRaP2P:
         return False
 
     def close(self):
+        self._closing.set()
         self.device.send_command(f"AT+PRECV={RAK3172.P2P_RX.DISABLE}")
         self.device.close()

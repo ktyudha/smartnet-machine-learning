@@ -384,6 +384,8 @@ class RAK3172:
         status, _ = self.send_command(f"AT+PRECV={RAK3172.P2P_RX.CONTINUOUS}")
         if status != "OK":
             self.enable_p2p_rx()
+            return False
+        return True
 
     @property
     def get_p2p_data(self):
