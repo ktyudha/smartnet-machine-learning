@@ -14,6 +14,7 @@ PYTHON_VENV := $(BIN)/python
 help:
 	@echo "Available commands:"
 	@echo "  make install   Create virtualenv & install dependencies"
+	@echo "  make install-pi Install gateway-only deps for Python 3.9 (Raspberry Pi) from requirements-pi.txt"
 	@echo "  make run       Run application"
 	@echo "  make run-bg    Run application in background (nohup, survives SSH disconnect)"
 	@echo "  make stop      Stop background process started with make run-bg"
@@ -41,6 +42,13 @@ install:
 	$(PYTHON_VENV) -m ensurepip --upgrade
 	$(PYTHON_VENV) -m pip install --upgrade pip
 	$(PYTHON_VENV) -m pip install -r requirements.txt
+
+.PHONY: install-pi
+install-pi:
+	$(PYTHON) -m venv $(VENV)
+	$(PYTHON_VENV) -m ensurepip --upgrade
+	$(PYTHON_VENV) -m pip install --upgrade pip
+	$(PYTHON_VENV) -m pip install -r requirements-pi.txt
 
 .PHONY: run
 run:

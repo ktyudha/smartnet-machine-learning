@@ -1,0 +1,10 @@
+# Gateway runtime only, pinned for Python 3.9 (Raspberry Pi OS Bullseye).
+# Install with: make install-pi
+# Training/plotting/notebook deps are intentionally omitted (use requirements.txt on a dev machine).
+python-dotenv==1.1.1
+paho-mqtt==2.1.0
+pyserial==3.5
+pandas==2.3.1
+numpy==2.0.2          # numpy 2.1+ needs Python >=3.10
+scikit-learn==1.6.1   # scikit-learn 1.7+ needs Python >=3.10
+joblib==1.5.1
