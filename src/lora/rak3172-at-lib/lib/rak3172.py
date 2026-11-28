@@ -47,7 +47,9 @@ class RAK3172:
         try:
             self.serial = serial.Serial(serial_port, 115200, timeout=1)
         except serial.SerialException as e:
-            sys.exit("/!\ Yo Dukie! Port not found! Aborting.")
+            sys.exit(f"/!\\ Cannot open serial port {serial_port}: {e} "
+                     "(permission denied -> add user to 'dialout' group; "
+                     "busy -> another process holds the port). Aborting.")
         self.serial.reset_input_buffer()
 
         # Open RX thread
