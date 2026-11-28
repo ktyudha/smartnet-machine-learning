@@ -56,16 +56,16 @@ run:
 
 .PHONY: run-bg
 run-bg:
+	@if pgrep -f "[m]ain.py" > /dev/null; then \
+		echo "main.py is already running (PID $$(pgrep -f "[m]ain.py" | tr '\n' ' ')). Run 'make stop' first."; \
+		exit 1; \
+	fi
 	nohup $(PYTHON_VENV) main.py > run.log 2>&1 & echo $$! > run.pid
 	@echo "Started in background (PID $$(cat run.pid)). Logs: run.log. SSH can be closed safely."
 
 .PHONY: stop
 stop:
-	@if [ -f run.pid ]; then \
-		kill $$(cat run.pid) && rm run.pid && echo "Stopped."; \
-	else \
-		echo "run.pid not found, process may not be running."; \
-	fi
+	@pkill -f "[m]ain.py" && echo "Stopped." || echo "No main.py process running."
 
 .PHONY: logs
 logs:
