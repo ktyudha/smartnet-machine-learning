@@ -1,17 +1,5 @@
 import argparse
 
-from src.commands.convert import run as convert
-from src.commands.prepare import run as prepare
-from src.commands.train import run as train
-from src.commands.tune import run as tune
-from src.commands.evaluate import run as evaluate
-from src.commands.predict import run as predict
-from src.commands.report import run as report
-from src.commands.tune_report import run as tune_report
-from src.commands.generate_dataset import run as generate_dataset
-from src.commands.hysteresis_analysis import run as hysteresis_analysis
-from src.commands.predict_plot import run as predict_plot
-from src.commands.lora_ports import run as lora_ports
 from src.config import setup_logger
 
 
@@ -86,40 +74,52 @@ def main():
     args = parser.parse_args()
 
     if args.command == "convert":
-        convert(args)
+        from src.commands.convert import run
+        run(args)
 
     elif args.command == "prepare":
-        prepare(args)
+        from src.commands.prepare import run
+        run(args)
 
     elif args.command == "train":
-        train(args)
+        from src.commands.train import run
+        run(args)
 
     elif args.command == "tune":
-        tune(args)
+        from src.commands.tune import run
+        run(args)
 
     elif args.command == "evaluate":
-        evaluate(args)
+        from src.commands.evaluate import run
+        run(args)
 
     elif args.command == "predict":
-        predict(args)
+        from src.commands.predict import run
+        run(args)
 
     elif args.command == "lora-ports":
-        lora_ports(args)
+        from src.commands.lora_ports import run
+        run(args)
 
     elif args.command == "report":
-        report(args)
+        from src.commands.report import run
+        run(args)
 
     elif args.command == "tune-report":
-        tune_report(args)
+        from src.commands.tune_report import run
+        run(args)
 
     elif args.command == "generate-dataset":
-        generate_dataset(args)
+        from src.commands.generate_dataset import run
+        run(args)
 
     elif args.command == "hysteresis-analysis":
-        hysteresis_analysis(args)
+        from src.commands.hysteresis_analysis import run
+        run(args)
 
     elif args.command == "predict-plot":
-        predict_plot(args)
+        from src.commands.predict_plot import run
+        run(args)
 
     else:
         parser.print_help()
